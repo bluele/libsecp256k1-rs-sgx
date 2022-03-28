@@ -28,7 +28,6 @@ mod ecdh;
 mod error;
 mod der;
 
-#[macro_use]
 extern crate alloc;
 
 use core::convert::TryFrom;
@@ -87,7 +86,7 @@ pub mod util {
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// Public key on a secp256k1 curve.
 pub struct PublicKey(Affine);
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 /// Secret key (256-bit) on a secp256k1 curve.
 pub struct SecretKey(Scalar);
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -99,12 +98,19 @@ pub struct Signature {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 /// Tag used for public key recovery from signatures.
 pub struct RecoveryId(u8);
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 /// Hashed message input to an ECDSA signature.
 pub struct Message(pub Scalar);
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// Shared secret using ECDH.
 pub struct SharedSecret<D: Digest>(GenericArray<u8, D::OutputSize>);
+
+impl<D> Copy for SharedSecret<D>
+where
+    D: Copy + Digest,
+    GenericArray<u8, D::OutputSize>: Copy,
+{
+}
 
 /// Format for public key parsing.
 pub enum PublicKeyFormat {
@@ -393,12 +399,6 @@ impl TryFrom<Scalar> for SecretKey {
     }
 }
 
-impl Drop for SecretKey {
-    fn drop(&mut self) {
-        self.0.clear();
-    }
-}
-
 impl core::fmt::LowerHex for SecretKey {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let scalar: Scalar = self.clone().into();
@@ -613,15 +613,6 @@ impl<D: Digest + Default> SharedSecret<D> {
 impl<D: Digest> AsRef<[u8]> for SharedSecret<D> {
     fn as_ref(&self) -> &[u8] {
         &self.0.as_ref()
-    }
-}
-
-impl<D: Digest> Drop for SharedSecret<D> {
-    fn drop(&mut self) {
-        let zero_array = GenericArray::clone_from_slice(&vec![0;D::output_size()]);
-         unsafe {
-            core::ptr::write_volatile(&mut self.0, zero_array);
-        }
     }
 }
 
